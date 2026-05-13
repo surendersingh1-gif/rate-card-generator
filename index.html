@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EMI Calculator – Time Stamped PDF</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --green: #2ecc71; --green-dark: #27ae60; --green-light: #eafaf1;
+    --bg: #f5f7fa; --card: #ffffff; --text: #1a2332;
+    --muted: #7f8c9a; --border: #e2e8f0; --accent: #16a085;
+    --header-bg: #1a5c3a; --header-text: #ffffff;
+    --edit-bg: #f0fff4;
+  }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); padding: 10px; display: flex; flex-direction: column; align-items: center; }
+  
+  #printArea { width: 100%; max-width: 600px; background: var(--bg); position: relative; }
+  
+  .page-header { text-align: center; margin-bottom: 5px; padding-top: 10px; }
+  .page-header h1 { font-family: 'Playfair Display', serif; font-size: 1.6rem; color: var(--text); }
+  
+  /* Time Stamp Style */
+  .pdf-timestamp { text-align: center; font-size: 0.7rem; color: var(--muted); margin-bottom: 15px; display: none; }
+  .pdf-wrap .pdf-timestamp { display: block !important; }
+
+  .action-bar { display: flex; flex-direction: column; gap: 12px; align-items: center; margin-bottom: 20px; width: 100%; }
+  .btn-pdf { background: linear-gradient(135deg, #1a5c3a 0%, #27ae60 100%); color: white; border: none; border-radius: 8px; padding: 14px; font-weight: 600; cursor: pointer; width: 100%; max-width: 320px; font-size: 1.1rem; box-shadow: 0 4px 15px rgba(39,174,96,0.3); }
+  
+  .secondary-btns { display: flex; gap: 8px; justify-content: center; width: 100%; }
+  .btn-secondary { flex: 1; max-width: 156px; border: none; border-radius: 6px; padding: 8px 12px; font-weight: 600; cursor: pointer; font-size: 0.85rem; text-align: center; text-decoration: none; color: white; display: flex; align-items: center; justify-content: center; }
+  .btn-blue { background: #3498db; }
+  .btn-red { background: #e74c3c; }
+
+  .card { background: var(--card); border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 15px; overflow: hidden; width: 100%; border: 1px solid var(--border); }
+  .section-header { background: var(--header-bg); color: white; padding: 12px 15px; font-weight: 600; font-size: 0.85rem; text-transform: uppercase; }
+
+  .info-header { background: var(--header-bg); display: flex; flex-direction: column; gap: 12px; padding: 15px; color: white; }
+  .info-group { display: flex; flex-direction: column; gap: 4px; }
+  .info-label { font-size: 0.75rem; font-weight: 600; opacity: 0.9; text-transform: uppercase; }
+  
+  .row { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding: 12px 15px; }
+  
+  .charges-grid { display: grid; grid-template-columns: 1fr; }
+  @media (min-width: 500px) { .charges-grid { grid-template-columns: 1fr 1fr; } }
+
+  .charge-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; border: 0.5px solid #f0f0f0; }
+
+  .ei { border: 1.5px solid #c3e6cb; background: var(--edit-bg); border-radius: 6px; padding: 6px 10px; font-weight: 600; color: #1a5c3a; width: 110px; text-align: right; font-size: 0.95rem; outline: none; }
+  .ei.hdr { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: white !important; width: 100%; text-align: left; }
+
+  .total-row { display: flex; justify-content: space-between; padding: 15px; font-weight: 700; background: var(--green-light); color: var(--accent); }
+
+  .emi-hero { background: linear-gradient(135deg, #1a5c3a 0%, #27ae60 100%); border-radius: 12px; padding: 20px; margin-bottom: 15px; color: white; display: flex; justify-content: space-between; align-items: center; }
+  .emi-hero .amount { font-family: 'Playfair Display', serif; font-size: 2rem; }
+  
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 20px; width: 100%; }
+  .stat-box { background: var(--green-light); border-radius: 10px; padding: 12px 5px; text-align: center; border: 1px solid #d5f5e3; }
+  .s-label { font-size: 0.65rem; font-weight: 700; color: var(--accent); text-transform: uppercase; margin-bottom: 5px; }
+  .s-value { font-size: 0.9rem; font-weight: 700; }
+
+  .hidden-row { display: none !important; }
+
+  .pdf-wrap { width: 750px !important; margin: 0 auto !important; padding: 20px !important; background: #fff !important; }
+  .pdf-wrap .ei { border: none !important; background: transparent !important; padding: 0 !important; color: #1a2332 !important; }
+  .pdf-wrap .ei.hdr { color: white !important; }
+  .pdf-wrap .stats-grid, .pdf-wrap .flat-rate-box, .pdf-wrap .secondary-btns { display: none !important; }
+  .pdf-wrap .emi-hero { justify-content: center; text-align: center; }
+</style>
+</head>
+<body>
+
+<div id="printArea">
+  <div class="page-header">
+    <h1>Rate Card</h1>
+  </div>
+  
+  <!-- Timestamp only visible in PDF -->
+  <div id="timeStampDisplay" class="pdf-timestamp"></div>
+
+  <div class="action-bar no-print" id="btnGroup">
+    <button class="btn-pdf" onclick="downloadPDF()">Download PDF</button>
+    <div class="secondary-btns">
+      <a href="https://drive.google.com/file/d/14by3O0Sq-lsFxYFU4xzT9Zb-HZ_OMbX8/view?usp=sharing" target="_blank" class="btn-secondary btn-blue">Guidelines</a>
+      <button class="btn-secondary btn-red" onclick="clearAllData()">Clear All Data</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="info-header">
+      <div class="info-group">
+        <label class="info-label">Customer Name</label>
+        <input class="ei hdr save-data" type="text" id="f_name" placeholder="Enter Name">
+      </div>
+      <div class="info-group">
+        <label class="info-label">Loan ID</label>
+        <input class="ei hdr save-data" type="text" id="f_loanid" placeholder="Enter Loan ID">
+      </div>
+    </div>
+    <div class="row">
+      <div class="cell">Tenure (Months)</div>
+      <div class="cell"><input class="ei save-data" type="number" id="f_tenure" placeholder="0" oninput="recalc()"></div>
+    </div>
+    <div class="row">
+      <div class="cell">Reducing ROI (%)</div>
+      <div class="cell"><input class="ei save-data" type="number" id="f_roi" step="0.01" placeholder="0.00" oninput="recalc()"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-header">Applicable Charges</div>
+    <div class="charges-grid">
+      <div class="charge-item"><span>Documentation</span><input class="ei charge-input save-data" type="number" id="c_doc" value="3998" oninput="recalc()"></div>
+      <div class="charge-item"><span>Processing Fees</span><input class="ei charge-input save-data" type="number" id="c_proc" placeholder="0" oninput="recalc()"></div>
+      <div class="charge-item"><span>GST on Charges</span><input class="ei charge-input save-data" type="number" id="c_gst_charges" placeholder="0" oninput="recalc()"></div>
+      <div class="charge-item"><span>GST on VAS</span><input class="ei charge-input save-data" type="number" id="c_gst_vas" placeholder="0" oninput="recalc()"></div>
+      <div class="charge-item"><span>RTO</span><input class="ei charge-input save-data" type="number" id="c_rto" placeholder="0" oninput="recalc()"></div>
+      <div class="charge-item"><span>Motor Insurance</span><input class="ei charge-input save-data" type="number" id="c_motins" placeholder="0" oninput="recalc()"></div>
+      <div class="charge-item"><span>Flexi Payment</span><input class="ei charge-input save-data" type="number" id="c_flexi" placeholder="0" oninput="recalc()"></div>
+      <div class="charge-item"><span>Health Monitor</span><input class="ei charge-input save-data" type="number" id="c_chm" value="4237" oninput="recalc()"></div>
+      <div class="charge-item"><span>RSA</span><input class="ei charge-input save-data" type="number" id="c_rsa" value="999" oninput="recalc()"></div>
+      <div class="charge-item"><span>Loan Insurance</span><input class="ei charge-input save-data" type="number" id="c_loanins" placeholder="0" oninput="recalc()"></div>
+      <div class="charge-item"><span>Other</span><input class="ei charge-input save-data" type="number" id="c_other" placeholder="0" oninput="recalc()"></div>
+      
+      <div class="charge-item" style="grid-column: 1 / -1; background: #fffdf0;">
+        <span><strong>Net Disbursable Amount</strong></span>
+        <input class="ei charge-input save-data" style="width: 120px;" type="number" id="c_disburse" placeholder="0" oninput="recalc()">
+      </div>
+    </div>
+    <div class="total-row">
+      <span>Total Loan Amount</span>
+      <span id="totalLoanAmount">₹0</span>
+    </div>
+  </div>
+
+  <div class="emi-hero">
+    <div>
+      <div style="font-size: 0.75rem; opacity: 0.8; font-weight: 600;">MONTHLY EMI</div>
+      <div class="amount" id="emiAmount">₹0</div>
+    </div>
+    <div class="flat-rate-box" id="flatRateBox">
+      <div style="font-size: 0.65rem; opacity: 0.8; font-weight: 600;">FLAT RATE</div>
+      <div style="font-size: 1.2rem; font-weight: 600;" id="flatBadge">0.00%</div>
+    </div>
+  </div>
+
+  <div class="stats-grid" id="statsGrid">
+    <div class="stat-box"><div class="s-label">Principal</div><div class="s-value" id="principalStat">₹0</div></div>
+    <div class="stat-box"><div class="s-label">Interest</div><div class="s-value" id="interestStat">₹0</div></div>
+    <div class="stat-box"><div class="s-label">Total Payable</div><div class="s-value" id="totalStat">₹0</div></div>
+  </div>
+</div>
+
+<script>
+  function n(id) { return parseFloat(document.getElementById(id).value) || 0; }
+  function fmt(v) { return '₹' + Math.round(v).toLocaleString('en-IN'); }
+
+  function saveData() {
+    const data = {};
+    document.querySelectorAll('.save-data').forEach(input => {
+      data[input.id] = input.value;
+    });
+    localStorage.setItem('emiCalcData', JSON.stringify(data));
+  }
+
+  function loadData() {
+    const saved = localStorage.getItem('emiCalcData');
+    if (saved) {
+      const data = JSON.parse(saved);
+      for (let id in data) {
+        const el = document.getElementById(id);
+        if (el) el.value = data[id];
+      }
+    }
+  }
+
+  function clearAllData() {
+    if(confirm("Sari entries aur saved data clear karein?")) {
+      localStorage.removeItem('emiCalcData');
+      location.reload();
+    }
+  }
+
+  function recalc() {
+    const inputs = document.querySelectorAll('.charge-input');
+    let totalLoan = 0;
+    inputs.forEach(input => { totalLoan += (parseFloat(input.value) || 0); });
+    const roi = n('f_roi'), tenure = n('f_tenure'), r = roi / 100 / 12;
+    let emi = (tenure > 0) ? (r === 0 ? totalLoan / tenure : (totalLoan * r * Math.pow(1+r, tenure)) / (Math.pow(1+r, tenure) - 1)) : 0;
+    const totalPayable = emi * tenure, totalInt = totalPayable - totalLoan;
+
+    document.getElementById('totalLoanAmount').textContent = fmt(totalLoan);
+    document.getElementById('emiAmount').textContent = fmt(emi);
+    document.getElementById('flatBadge').textContent = (tenure > 0 && totalLoan > 0 ? (totalInt / totalLoan / tenure * 12 * 100) : 0).toFixed(2) + '%';
+    document.getElementById('principalStat').textContent = fmt(totalLoan);
+    document.getElementById('interestStat').textContent = fmt(totalInt);
+    document.getElementById('totalStat').textContent = fmt(totalPayable);
+    saveData();
+  }
+
+  function downloadPDF() {
+    const element = document.getElementById('printArea');
+    const items = document.querySelectorAll('.charge-item');
+    const name = document.getElementById('f_name').value || 'Loan_Detail';
+    const timeDisplay = document.getElementById('timeStampDisplay');
+    
+    // Set Current Time Stamp
+    const now = new Date();
+    timeDisplay.textContent = "Generated on: " + now.toLocaleDateString() + " | " + now.toLocaleTimeString();
+
+    document.getElementById('btnGroup').style.display = 'none';
+    document.getElementById('flatRateBox').style.display = 'none';
+    document.getElementById('statsGrid').style.display = 'none';
+
+    items.forEach(item => {
+      if ((parseFloat(item.querySelector('input').value) || 0) === 0) item.classList.add('hidden-row');
+    });
+
+    element.classList.add('pdf-wrap');
+
+    const opt = {
+      margin: [10, 0, 10, 0],
+      filename: name + '.pdf',
+      image: { type: 'jpeg', quality: 1 },
+      html2canvas: { scale: 2, useCORS: true, width: 750 },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    html2pdf().from(element).set(opt).save().then(() => {
+      element.classList.remove('pdf-wrap');
+      document.getElementById('btnGroup').style.display = 'flex';
+      document.getElementById('flatRateBox').style.display = 'block';
+      document.getElementById('statsGrid').style.display = 'grid';
+      items.forEach(item => item.classList.remove('hidden-row'));
+      timeDisplay.textContent = ""; // Clear after save
+    });
+  }
+
+  loadData();
+  recalc();
+</script>
+</body>
+</html>
+```[cite: 1]
